@@ -117,6 +117,7 @@ let targetRotationY = 0;
 let targetY = 0;
 let mouseX = 0;
 let mouseY = 0;
+let isIntroActive = true; // Use a flag to prevent scroll loop from fighting GSAP
 
 window.addEventListener('mousemove', (e) => {
   mouseX = (e.clientX / window.innerWidth) * 2 - 1;
@@ -125,6 +126,7 @@ window.addEventListener('mousemove', (e) => {
 
 // Scroll to move up/down the cylinder
 window.addEventListener('wheel', (e) => {
+  if (isIntroActive) return; // Disable scrolling during intro
   targetY -= e.deltaY * 0.08;
   const maxHold = (CONFIG.rings * CONFIG.itemHeight * 1.8) / 2;
   targetY = Math.max(-maxHold, Math.min(maxHold, targetY));
@@ -144,8 +146,10 @@ function animate() {
   // Slowly rotate the entire gallery for atmospheric idle motion
   instancedMesh.rotation.y = time * 0.015;
 
-  // Smooth vertical scroll
-  camera.position.y += (targetY - camera.position.y) * 0.05;
+  // Smooth vertical scroll (only active after intro)
+  if (!isIntroActive) {
+    camera.position.y += (targetY - camera.position.y) * 0.05;
+  }
 
   renderer.render(scene, camera);
 }
@@ -159,17 +163,32 @@ window.addEventListener('resize', () => {
 });
 
 // --- Intro Sequence ---
-const enterBtn = document.getElementById('enter-button');
-const introScreen = document.getElementById('intro-screen');
+// Make sure DOM elements exist
+window.addEventListener('DOMContentLoaded', () => {
+  const enterBtn = document.getElementById('enter-button');
+  const introScreen = document.getElementById('intro-screen');
 
-enterBtn.addEventListener('click', () => {
-  introScreen.style.opacity = '0';
-  setTimeout(() => introScreen.remove(), 1000);
-  
-  // Ascend into the gallery
-  gsap.from(camera.position, {
-    y: -CONFIG.rings * CONFIG.itemHeight,
-    duration: 4,
-    ease: "power3.inOut"
-  });
+  if (enterBtn && introScreen) {
+    enterBtn.addEventListener('click', () => {
+      // Fade out overlay
+      introScreen.style.opacity = '0';
+      introScreen.style.pointerEvents = 'none'; // Prevent double clicks
+      
+      setTimeout(() => introScreen.remove(), 1000);
+      
+      // Ascend into the gallery
+      gsap.fromTo(camera.position, 
+        { y: -CONFIG.rings * CONFIG.itemHeight * 1.2 }, 
+        {
+          y: 0,
+          duration: 4,
+          ease: "power3.inOut",
+          onComplete: () => {
+            isIntroActive = false; // Enable scrolling once animation finishes
+            targetY = camera.position.y;
+          }
+        }
+      );
+    });
+  }
 });
